@@ -1,0 +1,21 @@
+# Load balancer WITHOUT sticky sessions (RT-2): plain round robin over the 8 instances.
+{$DOMAIN::80} {
+	@backend path /api/* /ws/* /health*
+	handle @backend {
+		reverse_proxy app1:3000 app2:3000 app3:3000 app4:3000 app5:3000 app6:3000 app7:3000 app8:3000 {
+			lb_policy round_robin
+			# SSE: write every event immediately, never buffer
+			flush_interval -1
+			health_uri /health/live
+			health_interval 5s
+			fail_duration 10s
+			lb_try_duration 3s
+		}
+	}
+	# Frontend build (../frontend/dist) served from the same public URL.
+	handle {
+		root * /srv/www
+		try_files {path} /index.html
+		file_server
+	}
+}
