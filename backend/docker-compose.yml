@@ -1,0 +1,90 @@
+# 8 stateless instances + Redis + Caddy (load balancer, HTTPS, frontend).
+# Usage (from this folder):  docker compose up -d --build
+x-app-env: &app-env
+  REDIS_URL: redis://redis:6379
+  PORT: "3000"
+  CORS_ORIGIN: ${CORS_ORIGIN:-*}
+  WINDOW_MS: ${WINDOW_MS:-2000}
+  DEBUG_ENDPOINTS: ${DEBUG_ENDPOINTS:-0}
+
+x-app: &app
+  build: .
+  restart: unless-stopped
+  depends_on: [redis]
+  ulimits:
+    nofile: { soft: 65535, hard: 65535 }
+  deploy:
+    resources:
+      limits: { memory: 768m }
+
+services:
+  redis:
+    image: redis:7.4-alpine
+    restart: unless-stopped
+    # noeviction: never silently drop idempotency keys or totals; AOF for durability.
+    command: ["redis-server", "--appendonly", "yes", "--appendfsync", "everysec", "--maxmemory", "1gb", "--maxmemory-policy", "noeviction"]
+    volumes: [redis-data:/data]
+
+  app1:
+    <<: *app
+    environment:
+      <<: *app-env
+      INSTANCE_ID: app-1
+
+  app2:
+    <<: *app
+    environment:
+      <<: *app-env
+      INSTANCE_ID: app-2
+
+  app3:
+    <<: *app
+    environment:
+      <<: *app-env
+      INSTANCE_ID: app-3
+
+  app4:
+    <<: *app
+    environment:
+      <<: *app-env
+      INSTANCE_ID: app-4
+
+  app5:
+    <<: *app
+    environment:
+      <<: *app-env
+      INSTANCE_ID: app-5
+
+  app6:
+    <<: *app
+    environment:
+      <<: *app-env
+      INSTANCE_ID: app-6
+
+  app7:
+    <<: *app
+    environment:
+      <<: *app-env
+      INSTANCE_ID: app-7
+
+  app8:
+    <<: *app
+    environment:
+      <<: *app-env
+      INSTANCE_ID: app-8
+
+  caddy:
+    image: caddy:2.8-alpine
+    restart: unless-stopped
+    depends_on: [app1, app2, app3, app4, app5, app6, app7, app8]
+    ports: ["80:80", "443:443"]
+    environment:
+      DOMAIN: ${DOMAIN:-}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ../frontend/dist:/srv/www:ro
+      - caddy-data:/data
+
+volumes:
+  redis-data:
+  caddy-data:
